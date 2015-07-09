@@ -17,9 +17,9 @@ from uuid import getnode as get_mac
 
 def main(argv):
 
-    print 'Sync PI and server time'       
-
-    json_data=open('config.json')
+    print 'Sync PI and server time'
+    configFileName = 'config.json'
+    json_data=open(configFileName)
     config_data = json.load(json_data)
     json_data.close()
 
@@ -43,7 +43,6 @@ def main(argv):
     token = ComputeHash(nowPI, config_data["Server"]["key"])
     authentication = config_data["Server"]["id"] + ":" + token
     print(authentication)
-    
     headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': nowPI, 'Authentication': authentication}
     
     deviceDetail = {}
@@ -51,6 +50,7 @@ def main(argv):
     deviceDetail["DeviceType"] = "Custom"
     deviceDetail["DeviceConfigurations"] = [{'Key':'IPPrivate','Value':[(s.connect(('8.8.8.8', 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]},
                                             {'Key':'IPPublic','Value': requests.get('http://icanhazip.com/').text},
+                                            {'Key': 'Configuration', 'Value': json.dumps(config_data) },
                                             {'Key':'MAC','Value': ':'.join(("%012X" % get_mac())[i:i+2] for i in range(0, 12, 2))}
                                            ]
 
@@ -60,7 +60,11 @@ def main(argv):
 
     if r.status_code == 200:
        print 'Response Content: {0}'.format(r.content)
-       data = json.loads(r.text)
+       data = json.loads(r.text)    
+       for entry in data['Device']['DeviceConfigurations']:
+           if entry['Key'] == 'Configuration':     
+              with open(configFileName, 'w') as outfile:
+                 json.dump(json.loads(entry['Value']), outfile)
        print 'Device configuration Successfully updated'
     else:
        print 'Error in setting time. Server response code: {0} {1}'.format(r.status_code, r.content)
