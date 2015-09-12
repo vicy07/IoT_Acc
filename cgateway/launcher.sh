@@ -1,5 +1,5 @@
 cd /
-cd home/pi/IoT_Acc/cgateway
+cd home/pi/IoT_At_Home/cgateway
 sleep 30
 ifconfig
 ./init.py
