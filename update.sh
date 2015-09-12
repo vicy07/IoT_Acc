@@ -3,9 +3,8 @@ mkdir github
 cd ~/IoT_At_Home/github
 git clone https://github.com/vicy07/IoT_At_Home
 cd ~/IoT_At_Home
-rsync -av --progress github/IoT_At_Home/cgateway/ cgateway --exclude config.json
-cd ..
-cd cgateway
+rsync -av --progress ~/IoT_At_Home/github/IoT_At_Home/cgateway/  ~/IoT_At_Home/cgateway --exclude config.json
+cd ~/IoT_At_Home/cgateway
 cd RF24
 sudo make install
 cd ~/IoT_At_Home/cgateway
