@@ -175,36 +175,6 @@ void* sendDataToCloud(void *cmd)
     return NULL;
 }
 
-int create_raspberry_cfg_stat_send_thread (pthread_t *threads, int *nextThreadId)
-{
-    struct cmdToThread s;
-
-    //TODO: Here we should call a thread function to collect all GW-related data in it and send it to the cloud.
-    if (*nextThreadId >= NUM_THREADS)
-        *nextThreadId = 0;
-
-    //cout << "nextThreadId" << nextThreadId;
-    ostringstream oss;
-    oss << "nextThreadId" << *nextThreadId << "\r\n";
-    cout << oss.str();
-
-    s.currentThreadId = *nextThreadId;
-    s.type = GATEWAY_SERVICE_DATA_MSG;
-    strncpy(s.cmd, "Null", sizeof(s.cmd)-1);
-
-    int err = pthread_create(&(threads[*nextThreadId]), NULL, &collectGWDataAndSendToCloud, (void*)&s);
-    pthread_detach(threads[*nextThreadId]);
-
-    if (err != 0)
-        logError(1, "ERROR: Can't create thread :[%s]", strerror(err));
-    else
-        log(1, "INFO: Thread Nr.%i created!\n", s.currentThreadId);
-
-    (*nextThreadId)++;
-
-    return RET_OK;
-}
-
 int main( int argc, char ** argv)
 {
     //TODO: Replace this parameter with configuration parameter
@@ -238,13 +208,6 @@ int main( int argc, char ** argv)
 #endif
             radio.startListening();
             pthread_mutex_unlock( &cs_mutex );
-
-            //TODO: Finish this method by sending all GW-related info to the Azure.
-
-            //create_raspberry_cfg_stat_send_thread(threads, &nextThreadId);
-
-            //oss << "nextThreadId:|" << nextThreadId << "|\r\n";
-            //cout << oss.str();
         }
 
         delayMicroseconds(100000);
