@@ -245,7 +245,7 @@ void loop(void)
     }
 
     // Now, continue listening
-    state = receive_data;
+    //state = receive_data;
     
   }//if (state == state_ping_out)
   
@@ -338,6 +338,8 @@ void loop(void)
       radio.startListening();
     }
   }
+  
+  delay(DELAY);
   
   iterations_count++;
   if (iterations_count>=RESET_Interval)
