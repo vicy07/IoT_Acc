@@ -4,7 +4,6 @@
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
-//#include <../mac.h>
 #include <dht.h>
 #include <EEPROM.h>
 #include <avr/pgmspace.h>
@@ -118,7 +117,7 @@ void setup(void)
 void loop(void)
 {
   bool ok;
-  char a[33];
+  char a[35];
   char abc[33];
   
   if ( state == state_initial )
@@ -397,7 +396,7 @@ int dealWithHumData(char* a, unsigned int aLen)
 {
   int value = (int)DHT.humidity;
   sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_h_%02i", value);
+  sprintf(a + strlen(a), "_h_%02i;", value);
   Serial.print(F("Now sending \"HumData\": "));
   printf("%s:", a);
     
@@ -422,7 +421,7 @@ int dealWithTempData(char* a, unsigned int aLen)
 {
   int value = (int)DHT.temperature;
   sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_t_%02i", value);
+  sprintf(a + strlen(a), "_t_%02i;", value);
   Serial.print(F("Now sending \"TempData\": "));
   printf("%s:", a);
     
@@ -447,7 +446,7 @@ uint16_t dealWithLuxData(char* a, unsigned int aLen)
 {
   uint16_t value = LightSensor.readLightLevel();
   sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_l_%i", value);
+  sprintf(a + strlen(a), "_l_%i;", value);
   Serial.print(F("Now sending "));
   printf("%s:", a);
     
@@ -479,7 +478,7 @@ bool dealWithPIRData(char* a, unsigned int aLen)
 {
   int value = digitalRead(PIR_PIN);
   sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_p_%01i", value);
+  sprintf(a + strlen(a), "_p_%01i;", value);
   Serial.print(F("Now sending "));
   printf("%s:", a);
 
