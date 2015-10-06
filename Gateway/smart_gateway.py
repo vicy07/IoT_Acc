@@ -30,7 +30,7 @@ def ComputeHash(timeStamp, key):
     return signature
 
 pipes = [[0xf0, 0xf0, 0xf0, 0xf0, 0xd2], [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]]
-configFileName = 'config.json'
+configFileName = os.path.dirname(os.path.abspath(__file__)) + '/config.json'
 
 json_data=open(configFileName)
 config_data = json.load(json_data)
