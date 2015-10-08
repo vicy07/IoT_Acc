@@ -6,6 +6,9 @@
 from nrf24 import NRF24
 import time
 from time import gmtime, strftime
+import RPi.GPIO as GPIO
+
+GPIO.cleanup() 
 
 pipes = [[0xf0, 0xf0, 0xf0, 0xf0, 0xd2], [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]]
 
