@@ -43,7 +43,8 @@ token = ComputeHash(nowPI, config_data["Server"]["key"])
 authentication = config_data["Server"]["id"] + ":" + token
 headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Authentication': authentication}
 print 'Server side URL:' + href
-r = requests.get(href, headers=headers, verify=False)
+#r = requests.get(href, headers=headers, verify=False)
+r = requests.get(href, headers=headers)
 if r.status_code == 200:
     nowPI = r.json()
     print ("Setting up time to: " + nowPI)
@@ -68,7 +69,9 @@ deviceDetail["DeviceConfigurations"] = [{'Key':'IPPrivate','Value':[(s.connect((
 
 payload = {'Device': deviceDetail}
 print 'Request Content: {0}'.format(json.dumps(payload))
-r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+#r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+r = requests.post(href, headers=headers, data=json.dumps(payload))
+
 
 if r.status_code == 200:
    print 'Response Content: {0}'.format(r.content)
@@ -127,7 +130,8 @@ def setAlarmState(config_data, now_, temper, humi, luxi, deviceId, move=0):
 
     payload = {'events': measurements, "deviceId": deviceId}
     print(json.dumps(payload))
-    r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+#    r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+    r = requests.post(href, headers=headers, data=json.dumps(payload))
     print (r)
 
 
@@ -188,25 +192,27 @@ while True:
            lux = temp[2]
            print "Lux: ", lux
     
-       setAlarmState(config_data, nowPI, temperature, hum, lux, config_data["Devices"][temp[0]], movement)
+       if temp[0] in config_data["Devices"]:
+          setAlarmState(config_data, nowPI, temperature, hum, lux, config_data["Devices"][temp[0]], movement)
 
-       href = config_data["Server"]["url"] + 'api/events/process'
-       token = ComputeHash(nowPI, config_data["Server"]["key"])
-       authentication = config_data["Server"]["id"] + ":" + token
-       print(authentication)
+          href = config_data["Server"]["url"] + 'api/events/process'
+          token = ComputeHash(nowPI, config_data["Server"]["key"])
+          authentication = config_data["Server"]["id"] + ":" + token
+          print(authentication)
     
-       headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': nowPI, 'Authentication': authentication}
-       measurements = []    
+          headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': nowPI, 'Authentication': authentication}
+          measurements = []    
 
-       measure = {}
-       measure["EventType"] = 32
-       measure["EventValue"] = 1
-       measure["EventTime"] = nowPI
-       measurements.append(measure)
+          measure = {}
+          measure["EventType"] = 32
+          measure["EventValue"] = 1
+          measure["EventTime"] = nowPI
+          measurements.append(measure)
        
-       print measurements
+          print measurements
 
-       payload = {'events': measurements, "deviceId": config_data["Server"]["Deviceid"]}
-       print(json.dumps(payload))
-       r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
-       print (r)
+          payload = {'events': measurements, "deviceId": config_data["Server"]["Deviceid"]}
+          print(json.dumps(payload))
+#          r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+          r = requests.post(href, headers=headers, data=json.dumps(payload))
+          print (r)
