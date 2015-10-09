@@ -24,7 +24,7 @@ from uuid import getnode as get_mac
 
 import RPi.GPIO as GPIO
 
-
+from azure.servicebus import ServiceBusService, Message, Queue
 ##############################
 #   Compute secured Hash     #
 ##############################
@@ -38,7 +38,10 @@ def ComputeHash(timeStamp, key):
 ##############################
 # Send Measurements to cloud #
 ##############################
-def setAlarmState(config_data, now_, temper, humi, luxi, deviceId, move=0, debugMode=0):    
+def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugMode=0):    
+
+    measures = { "t": "1", "h": 2, "p": "7", "l":"6" }
+
     href = config_data["Server"]["url"] + 'api/events/process'
     token = ComputeHash(now_, config_data["Server"]["key"])
     authentication = config_data["Server"]["id"] + ":" + token
@@ -47,35 +50,12 @@ def setAlarmState(config_data, now_, temper, humi, luxi, deviceId, move=0, debug
     
     headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': now_, 'Authentication': authentication}
     measurements = []    
-    if temper != "":
-        temp = {}
-        temp["EventType"] = 1
-        temp["EventValue"] = int(temper)
-        temp["EventTime"] = now_
-        measurements.append(temp)
 
-    if humi != "":
-        hum = {}
-        hum["EventType"] = 2
-        hum["EventValue"] = int(humi)
-        hum["EventTime"] = now_
-        measurements.append(hum)
-
-    if move != "":
-        movement = {}
-        movement["EventType"] = 7
-        movement["EventValue"] = int(move)
-        movement["EventTime"] = now_
-        measurements.append(movement)
-
-    if luxi != "":
-        lux = {}
-        lux["EventType"] = 6
-        lux["EventValue"] = int(luxi)
-        lux["EventTime"] = now_
-        measurements.append(lux)
-
-    #measurements = [{"EventType":7,"EventValue":temp,"EventTime":now_},{"EventType":6,"EventValue":hum,"EventTime":now_},{"EventType":1,"EventValue":movement,"EventTime":now_}]
+    measure = {}
+    measure["EventType"] = measures[measure_type]
+    measure["EventValue"] = int(measure_value)
+    measure["EventTime"] = now_
+    measurements.append(measure)
 
     if debugMode == 1: print measurements
 
@@ -87,20 +67,51 @@ def setAlarmState(config_data, now_, temper, humi, luxi, deviceId, move=0, debug
     else: print '-> ' + str(r.status_code)
 
 
+# Send Gateway "Alive" message
+    measurements = []    
+
+    measure = {}
+    measure["EventType"] = 32
+    measure["EventValue"] = 1
+    measure["EventTime"] = now_
+    measurements.append(measure)
+       
+    if debugMode == 1: print measurements
+
+    payload = {'events': measurements, "deviceId": config_data["Server"]["Deviceid"]}
+    if debugMode == 1: print(json.dumps(payload))
+    #r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+    r = requests.post(href, headers=headers, data=json.dumps(payload))
+    if debugMode == 1: print (r)
+
 
 
 
 def main(argv):
-
    print '##################################################################'
    print '#                         NRF24 gateway                          #'
    print '##################################################################'
+
+
+   # Wait while internet appear
+   import urllib2 
+   loop_value = 1
+   while (loop_value == 1):
+      try:
+           urllib2.urlopen("http://google.com")
+      except urllib2.URLError, e:
+           print( "Network: currently down." )
+           time.sleep( 10 )
+      else:
+           print( "Network: Up and running." )
+           loop_value = 0
+
+
 
    pipes = [[0xf0, 0xf0, 0xf0, 0xf0, 0xd2], [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]]
    configFileName = os.path.dirname(os.path.abspath(__file__)) + '/config.json'
    debugMode = 0
 
-   
    try:
       opts, args = getopt.getopt(argv,"hd:f:",["debug=","configFile="])
    except getopt.GetoptError:
@@ -126,8 +137,23 @@ def main(argv):
    print '      Server URL:', config_data["Server"]["url"]
    print '      Company ID:', config_data["Server"]["id"]
    print '      Gateway ID:', config_data["Server"]["Deviceid"]
-   print ''
+   print '     Service Bus:', config_data["Servicebus"]["namespace"]
 
+   queue_name = 'custom_' + config_data["Server"]["id"] + '_' + config_data["Server"]["Deviceid"]
+   bus_service = ServiceBusService( service_namespace='rdciot', shared_access_key_name='RootManageSharedAccessKey', shared_access_key_value='EXeZe7r49jCoDz79fESxtMdXwYU6iQwG1Gbo8J4HXyY=')
+   try:
+      bus_service.receive_queue_message(queue_name, peek_lock=False)
+      print '  Actuator queue: ' + queue_name
+   except:
+      queue_options = Queue()
+      queue_options.max_size_in_megabytes = '1024'
+      queue_options.default_message_time_to_live = 'PT15M'
+      bus_service.create_queue(queue_name, queue_options)
+      print '  Actuator queue: ' + queue_name + ' (Created)'
+
+
+
+   print ''
    nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
    href = config_data["Server"]["url"] + 'API/Device/GetServerDateTime'
@@ -201,8 +227,10 @@ def main(argv):
    print ''
    while True:
        pipe = [0]
+       cloudCommand = ''
        while not radio.available(pipe, True):
            time.sleep(1)
+
        recv_buffer = []
        radio.read(recv_buffer)
        out = ''.join(chr(i) for i in recv_buffer)
@@ -214,57 +242,18 @@ def main(argv):
           temp =out.split("_")
           if debugMode == 1: print (temp)
     
-          nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-          #Regular data message
-          hum = ''
-          if temp[1] == "h":
-              hum = temp[2]
-              if debugMode == 1: print "Hum: ", hum
-
-          temperature = ''        
-          if temp[1] == "t":
-              temperature = temp[2]
-              if debugMode == 1: print "Temp: ", temperature
-
-          movement = ''        
-          if temp[1] == "p":
-              movement = temp[2]
-              if debugMode == 1: print "PIR: ", movement
-
-          lux = ''          
-          if temp[1] == "l":
-              lux = temp[2]
-              if debugMode == 1: print "Lux: ", lux
-    
           if temp[0] in config_data["Devices"]:
-             setAlarmState(config_data, nowPI, temperature, hum, lux, config_data["Devices"][temp[0]], movement, debugMode)
-
-             href = config_data["Server"]["url"] + 'api/events/process'
-             token = ComputeHash(nowPI, config_data["Server"]["key"])
-             authentication = config_data["Server"]["id"] + ":" + token
-             if debugMode == 1: print(authentication)
-    
-             headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': nowPI, 'Authentication': authentication}
-             measurements = []    
-
-             measure = {}
-             measure["EventType"] = 32
-             measure["EventValue"] = 1
-             measure["EventTime"] = nowPI
-             measurements.append(measure)
-       
-             if debugMode == 1: print measurements
-
-             payload = {'events': measurements, "deviceId": config_data["Server"]["Deviceid"]}
-             if debugMode == 1: print(json.dumps(payload))
-             #r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
-             r = requests.post(href, headers=headers, data=json.dumps(payload))
-             if debugMode == 1: print (r)
+             nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+             sendMeasure(config_data, nowPI, temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
           else:
-             print '-> ignore'             
+             print '-> ignore'
 
-
+       if queue_name <> '':
+          cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+          if cloudCommand:
+                print '-> ' + str(cloudCommand.body)
+          else:
+                print '-> ignoring'
 
 if __name__ == "__main__":
    main(sys.argv[1:])
