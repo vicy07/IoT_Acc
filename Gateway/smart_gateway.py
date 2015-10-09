@@ -140,7 +140,9 @@ def main(argv):
    print '     Service Bus:', config_data["Servicebus"]["namespace"]
 
    queue_name = 'custom_' + config_data["Server"]["id"] + '_' + config_data["Server"]["Deviceid"]
-   bus_service = ServiceBusService( service_namespace='rdciot', shared_access_key_name='RootManageSharedAccessKey', shared_access_key_value='EXeZe7r49jCoDz79fESxtMdXwYU6iQwG1Gbo8J4HXyY=')
+   bus_service = ServiceBusService( service_namespace=config_data["Servicebus"]["namespace"], 
+                                    shared_access_key_name=config_data["Servicebus"]["shared_access_key_name"], 
+                                    shared_access_key_value=config_data["Servicebus"]["shared_access_key_value"])
    try:
       bus_service.receive_queue_message(queue_name, peek_lock=False)
       print '  Actuator queue: ' + queue_name
