@@ -210,6 +210,7 @@ def main(argv):
    radio.startListening()
 
    print ''
+   cloudCommandLastCheck = datetime.now()
    while True:
        pipe = [0]
        cloudCommand = ''
@@ -219,6 +220,8 @@ def main(argv):
        recv_buffer = []
        radio.read(recv_buffer)
        out = ''.join(chr(i) for i in recv_buffer)
+
+       nowPI = datetime.now()
  
        if out.find(';')>0:
           out = out.split(';')[0]
@@ -228,20 +231,24 @@ def main(argv):
           if debugMode == 1: print (temp)
     
           if temp[0] in config_data["Devices"]:
-             nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-             sendMeasure(config_data, nowPI, temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
+             sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
 
              print config_data["Server"]["Deviceid"] + '_live_1',
-             sendMeasure(config_data, nowPI, 'live', 1, config_data["Server"]["Deviceid"], debugMode)
+             sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'live', 1, config_data["Server"]["Deviceid"], debugMode)
           else:
              print '-> ignore'
 
+
        if queue_name <> '':
-          cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
-          if cloudCommand:
-                print '-> ' + str(cloudCommand.body)
-          else:
-                print '-> ignoring'
+          tdelta = nowPI-cloudCommandLastCheck
+          if (abs(tdelta.total_seconds()) > 90):
+             cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+             cloudCommandLastCheck = datetime.now()
+             print 'Azure Command -> ',
+             if cloudCommand:
+                   print ' ' + str(cloudCommand.body)
+             else:
+                   print ' No Commands'
 
 if __name__ == "__main__":
    main(sys.argv[1:])
