@@ -402,13 +402,7 @@ int dealWithHumData(char* a, unsigned int aLen)
     
   if (m_humd != value)  
   {
-      while (!radio.write(a, aLen))
-      {
-          Serial.print(F("."));
-          rest();
-          delay(RETRY_TIMEOUT);
-      }
-      Serial.print(F("ok.\r\n"));
+      sendMessage(a, aLen);
       
       m_humd = value;
   }    
@@ -430,13 +424,7 @@ int dealWithTempData(char* a, unsigned int aLen)
     
   if (m_temp != value)  
   {
-      while (!radio.write(a, aLen))
-      {
-          Serial.print(F("."));
-          rest();
-          delay(RETRY_TIMEOUT);
-      }
-      Serial.print(F("ok.\r\n"));
+      sendMessage(a, aLen);
       
       m_temp = value;      
   }
@@ -460,13 +448,7 @@ uint16_t dealWithLuxData(char* a, unsigned int aLen)
   {
     if ((value>=0)&&(value<=5000))
     {
-        while (!radio.write(a, aLen))
-        {
-            Serial.print(F("."));
-            rest();
-            delay(RETRY_TIMEOUT);
-        }
-        Serial.print(F("ok.\r\n"));
+        sendMessage(a, aLen);
     }
     else
     {
@@ -497,14 +479,7 @@ bool dealWithPIRData(char* a, unsigned int aLen)
   if (m_pir != value)  
 #endif
   {
-    while (!radio.write(a, aLen))
-    {
-        Serial.print(F("."));
-        rest();
-        delay(DELAY);
-    }
-    Serial.print(F("ok.\r\n"));
-
+    sendMessage(a, aLen);
       
     m_pir = value;            
   }
@@ -522,6 +497,17 @@ void rest()
 {
   radio.startListening();
   radio.stopListening();
+}
+
+int sendMessage(const void *buf, uint8_t aLen)
+{
+    while (!radio.write(buf, aLen))
+    {
+        Serial.print(F("."));
+        rest();
+        delay(DELAY);
+    }
+    Serial.print(F("ok.\r\n"));
 }
 
 void resetMeasurement()
