@@ -96,16 +96,16 @@ def main(argv):
    # Wait while internet appear
    import urllib2 
    loop_value = 1
-   while (loop_value == 1):
+   while (loop_value < 10):
       try:
            urllib2.urlopen("http://google.com")
-      except urllib2.URLError, e:
+      except:
            print( "Network: currently down." )
            time.sleep( 10 )
+           loop_value = loop_value + 1
       else:
            print( "Network: Up and running." )
-           loop_value = 0
-
+           loop_value = 10
 
 
    pipes = [[0xf0, 0xf0, 0xf0, 0xf0, 0xd2], [0xf0, 0xf0, 0xf0, 0xf0, 0xe1]]
