@@ -11,7 +11,7 @@
 //Validation for Sensors changes each 20 sec
 #define DELAY 3000
 //Control Values = 90 times
-#define RESET_Interval 50
+#define RESET_Interval 500
 #define DHT_PIN 2
 #define PIR_PIN 4
 #define RESET_PIN 3
@@ -402,10 +402,13 @@ int dealWithHumData(char* a, unsigned int aLen)
     
   if (m_humd != value)  
   {
-    if (radio.write(a, aLen))
-      Serial.print(F("ok.\n\r"));
-    else
-      Serial.print(F("failed.\n\r"));
+      while (!radio.write(a, aLen))
+      {
+          Serial.print(F("."));
+          rest();
+          delay(RETRY_TIMEOUT);
+      }
+      Serial.print(F("ok.\r\n"));
       
       m_humd = value;
   }    
@@ -427,12 +430,15 @@ int dealWithTempData(char* a, unsigned int aLen)
     
   if (m_temp != value)  
   {
-    if (radio.write(a, aLen))
-      Serial.print(F("ok, "));
-    else
-      Serial.print(F("failed, "));
+      while (!radio.write(a, aLen))
+      {
+          Serial.print(F("."));
+          rest();
+          delay(RETRY_TIMEOUT);
+      }
+      Serial.print(F("ok.\r\n"));
       
-    m_temp = value;      
+      m_temp = value;      
   }
   else
   {
@@ -454,10 +460,13 @@ uint16_t dealWithLuxData(char* a, unsigned int aLen)
   {
     if ((value>=0)&&(value<=5000))
     {
-      if (radio.write(a, aLen))
-        Serial.print(F("ok.\n\r"));
-      else
-        Serial.print(F("failed.\n\r")); 
+        while (!radio.write(a, aLen))
+        {
+            Serial.print(F("."));
+            rest();
+            delay(RETRY_TIMEOUT);
+        }
+        Serial.print(F("ok.\r\n"));
     }
     else
     {
@@ -488,10 +497,14 @@ bool dealWithPIRData(char* a, unsigned int aLen)
   if (m_pir != value)  
 #endif
   {
-    if (radio.write(a, aLen))
-      Serial.print(F("ok.\r\n"));
-    else
-      Serial.print(F("failed.\n\r"));
+    while (!radio.write(a, aLen))
+    {
+        Serial.print(F("."));
+        rest();
+        delay(DELAY);
+    }
+    Serial.print(F("ok.\r\n"));
+
       
     m_pir = value;            
   }
