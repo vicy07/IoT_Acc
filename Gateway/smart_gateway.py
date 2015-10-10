@@ -40,7 +40,7 @@ def ComputeHash(timeStamp, key):
 ##############################
 def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugMode=0):    
 
-    measures = { "t": "1", "h": 2, "p": "7", "l":"6" }
+    measures = { "t": "1", "h": 2, "p": "7", "l":"6", "live":"32" }
 
     href = config_data["Server"]["url"] + 'api/events/process'
     token = ComputeHash(now_, config_data["Server"]["key"])
@@ -66,23 +66,6 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
     if debugMode == 1: print (r)
     else: print '-> ' + str(r.status_code)
 
-
-# Send Gateway "Alive" message
-    measurements = []    
-
-    measure = {}
-    measure["EventType"] = 32
-    measure["EventValue"] = 1
-    measure["EventTime"] = now_
-    measurements.append(measure)
-       
-    if debugMode == 1: print measurements
-
-    payload = {'events': measurements, "deviceId": config_data["Server"]["Deviceid"]}
-    if debugMode == 1: print(json.dumps(payload))
-    #r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
-    r = requests.post(href, headers=headers, data=json.dumps(payload))
-    if debugMode == 1: print (r)
 
 
 
@@ -247,6 +230,9 @@ def main(argv):
           if temp[0] in config_data["Devices"]:
              nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
              sendMeasure(config_data, nowPI, temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
+
+             print config_data["Server"]["Deviceid"] + '_live_1',
+             sendMeasure(config_data, nowPI, 'live', 1, config_data["Server"]["Deviceid"], debugMode)
           else:
              print '-> ignore'
 
