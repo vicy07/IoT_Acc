@@ -9,7 +9,7 @@
 #include <avr/pgmspace.h>
 
 //Validation for Sensors changes each 20 sec
-#define DELAY 3000
+#define DELAY 2000
 //Control Values = 90 times
 #define RESET_Interval 500
 #define DHT_PIN 2
@@ -244,37 +244,19 @@ void loop(void)
     }
 
     // Now, continue listening
-    //state = receive_data;
+    state = receive_data;
     
   }//if (state == state_ping_out)
   
+
+  rest();  
   if (state == receive_data)
   {
     int retrycount = 0;
-    
-    rest();
-    delay(RETRY_TIMEOUT);
-    
-    Serial.print(F("\r\nSending Data reception ready notification.\r\n"));
-    snprintf(a, sizeof(a), "!d_v01_%03i", NodeID);
-    
-    retrycount = 0;
-    while (!radio.write(a, sizeof(a)))
-    {
-      delay(RETRY_TIMEOUT);
-      if(++retrycount > MAX_RETRY_COUNT)
-        break;
-      Serial.print(F("."));
-    }
-    
-    retrycount = 0;
-    Serial.print(F("ok"));
-    Serial.print(F("\n\r"));
-
     radio.startListening();
   
+    int msg[32];
     Serial.print(F("Starting Receiving.\r\n"));
-    
     while (!radio.available())
     {        
       delay(RETRY_TIMEOUT);
@@ -291,14 +273,17 @@ void loop(void)
     }
     else
     {
-      // Fetch the payload, and see if this was the last one.
-//      char abc[20];
+      // Expect to read command
       radio.read( abc, sizeof(abc) );
       Serial.print(F("Received: "));
       printf("%s\r\n", abc);
+
+      // TODO: validate that it is for you and ignore if not
+      
+      state = state_pong_back;
     }
-  }//if (state == receive_data)
-  
+    
+  }
   
   //
   // Pong back state.  Receive each packet, dump it out, and send it back
@@ -306,36 +291,20 @@ void loop(void)
 
   if ( state == state_pong_back )
   {
-    // if there is data ready
-    if ( radio.available() )
-    {
-      // Dump the payloads until we've gotten everything
-      unsigned long got_time;
-      bool done = false;
-      while (!done)
-      {
-        // Fetch the payload, and see if this was the last one.
-        radio.read( &got_time, sizeof(unsigned long) );
-
-        // Spew it
-        Serial.print(F("Got payload "));
-        printf("%lu...",got_time);
-
-	// Delay just a little bit to let the other unit
-	// make the transition to receiver
-	delay(20);
-      }
-
       // First, stop listening so we can talk
       radio.stopListening();
 
+      Serial.print(F("Sending Confirmation response: "));
+      
       // Send the final one back.
-      radio.write( &got_time, sizeof(unsigned long) );
-      Serial.print(F("Sent response.\n\r"));
+      sprintf(a, "%03i", NodeID);
+      sprintf(a + strlen(a), "_ack_%s;",abc);
+      printf("%s:", a);
+      sendMessage(a, sizeof(a));
 
       // Now, resume listening so we catch the next packets.
       radio.startListening();
-    }
+      state = state_ping_out;
   }
   
   delay(DELAY);

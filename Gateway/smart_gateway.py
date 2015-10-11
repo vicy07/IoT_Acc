@@ -211,6 +211,9 @@ def main(argv):
 
    print ''
    cloudCommandLastCheck = datetime.now()
+
+   # List to hold all commands that was send no ACK received
+   localCommandSendAckWaitList = []
    while True:
        pipe = [0]
        cloudCommand = ''
@@ -231,24 +234,45 @@ def main(argv):
           if debugMode == 1: print (temp)
     
           if temp[0] in config_data["Devices"]:
-             sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
 
-             print config_data["Server"]["Deviceid"] + '_live_1',
-             sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'live', 1, config_data["Server"]["Deviceid"], debugMode)
+             if temp[1] == 'ack':
+               # Clean list once ACK from SN is received
+                localCommandSendAckWaitList= [x for x in localCommandSendAckWaitList if x != temp[2]]
+                print '<- Broadcast complete, ACK received for: ' + temp[2]
+             else:
+                sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
+                print config_data["Server"]["Deviceid"] + '_live_1',
+                sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'live', 1, config_data["Server"]["Deviceid"], debugMode)
           else:
              print '-> ignore'
 
 
+
        if queue_name <> '':
+          # if check timeout is gone go to Azure and grab command to execute
           tdelta = nowPI-cloudCommandLastCheck
-          if (abs(tdelta.total_seconds()) > 90):
+          if (abs(tdelta.total_seconds()) > 30):
              cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
              cloudCommandLastCheck = datetime.now()
              print 'Azure Command -> ',
              if cloudCommand:
                    print ' ' + str(cloudCommand.body)
+                   
+                   #TODO: local network device ID use there
+                   stringComand='798-' + str(cloudCommand.body)
+
+                   localCommandSendAckWaitList.append(stringComand)
              else:
-                   print ' No Commands'
+                   print ' No Commands from Azure'
+
+          # Repeat sending/span commands while list is not empty
+          for localCommand in localCommandSendAckWaitList:
+             radio.stopListening()
+             buf = list(localCommand)
+             radio.write(buf)
+             print 'Broadcast Command locally: ' + localCommand 
+             time.sleep(1)
+             radio.startListening()
 
 if __name__ == "__main__":
    main(sys.argv[1:])
