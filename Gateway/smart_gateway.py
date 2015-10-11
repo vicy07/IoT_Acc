@@ -251,7 +251,7 @@ def main(argv):
        if queue_name <> '':
           # if check timeout is gone go to Azure and grab command to execute
           tdelta = nowPI-cloudCommandLastCheck
-          if (abs(tdelta.total_seconds()) > 30):
+          if (abs(tdelta.total_seconds()) > 90):
              cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
              cloudCommandLastCheck = datetime.now()
              print 'Azure Command -> ',
