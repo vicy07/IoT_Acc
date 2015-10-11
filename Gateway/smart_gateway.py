@@ -25,6 +25,10 @@ from uuid import getnode as get_mac
 import RPi.GPIO as GPIO
 
 from azure.servicebus import ServiceBusService, Message, Queue
+
+import logging
+logging.basicConfig(level=logging.DEBUG, filename=os.path.dirname(os.path.abspath(__file__)) + '/last_error.log')
+
 ##############################
 #   Compute secured Hash     #
 ##############################
@@ -262,6 +266,7 @@ def main(argv):
                    stringComand='798-' + str(cloudCommand.body)
 
                    localCommandSendAckWaitList.append(stringComand)
+                   localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
              else:
                    print ' No Commands from Azure'
 
@@ -275,4 +280,7 @@ def main(argv):
              radio.startListening()
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+   try:
+      main(sys.argv[1:])
+   except:
+      logging.exception(datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
