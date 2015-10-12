@@ -256,10 +256,14 @@ def main(argv):
           # if check timeout is gone go to Azure and grab command to execute
           tdelta = nowPI-cloudCommandLastCheck
           if (abs(tdelta.total_seconds()) > 90):
-             cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+             try:
+                cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+             except:
+                continue
+ 
              cloudCommandLastCheck = datetime.now()
              print 'Azure Command -> ',
-             if cloudCommand:
+             if cloudCommand.body is not None:
                    print ' ' + str(cloudCommand.body)
                    
                    #TODO: local network device ID use there
