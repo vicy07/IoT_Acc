@@ -264,12 +264,15 @@ def main(argv):
              cloudCommandLastCheck = datetime.now()
              print 'Azure Command -> ',
              if cloudCommand.body is not None:
-                   print ' ' + str(cloudCommand.body)
-                   
-                   #TODO: local network device ID use there
-                   stringComand='798-' + str(cloudCommand.body)
+                   stringCommand = str(cloudCommand.body)
+                   print ' "' + stringCommand + '" => ',
 
-                   localCommandSendAckWaitList.append(stringComand)
+                   #Tranlate External/Cloud ID to local network ID 
+                   temp = stringCommand.split("-") 
+                   localNetworkDeviceID = config_data["Devices"].keys()[config_data["Devices"].values().index(temp[0])]
+
+                   localCommandSendAckWaitList.append(str(localNetworkDeviceID + '-' + temp[1]))
+                   print ' "' + localNetworkDeviceID + '-' + temp[1] + '"'
                    localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
              else:
                    print ' No Commands from Azure'
