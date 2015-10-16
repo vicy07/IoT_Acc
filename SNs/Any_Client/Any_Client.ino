@@ -1,7 +1,6 @@
 #include <BH1750.h>
 #include <Wire.h>
 #include <SPI.h>
-#include "nRF24L01.h"
 #include "RF24.h"
 #include "printf.h"
 #include <dht.h>
@@ -278,9 +277,24 @@ void loop(void)
       Serial.print(F("Received: "));
       printf("%s\r\n", abc);
 
-      // TODO: validate that it is for you and ignore if not
+      //GET First 3 as SN ID
+      char target_device[3]; 
+      memcpy(target_device, abc + 0 /* Offset */, 3 /* Length */);
+      target_device[3] = 0; /* Add terminator */
+      int target_device_ID;
+      sscanf(target_device, "%d", &target_device_ID);
       
-      state = state_pong_back;
+      if (target_device_ID == NodeID)
+      {
+         printf("- Mine (SN=%i), start to process\r\n", target_device_ID); 
+         state = state_pong_back;         
+      }
+      else
+      {
+         printf("- Not mine, but for SN=%i\r\n", target_device_ID); 
+         state = state_ping_out;         
+      }
+
     }
     
   }
