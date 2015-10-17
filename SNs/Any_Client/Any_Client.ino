@@ -98,7 +98,10 @@ void setup(void)
   
   pinMode(PIR_PIN, INPUT);  
   digitalWrite(PIR_PIN, HIGH);
-//  pinMode(SWITCH_CONTROL, OUTPUT);
+  
+  pinMode(SWITCH_CONTROL, OUTPUT);
+  digitalWrite(SWITCH_CONTROL, LOW);  
+  
 //  pinMode(RESET_PIN, INPUT);
 //  EEPROM_writelong(0,21);
 //  pinMode(RESET_PIN, INPUT_PULLUP);
@@ -273,13 +276,12 @@ void loop(void)
     else
     {
       // Expect to read command
-      radio.read( abc, sizeof(abc) );
-      Serial.print(F("Received: "));
-      printf("%s\r\n", abc);
+      radio.read( msg, sizeof(abc) );
+      printf("Received: %s ", msg);
 
       //GET First 3 as SN ID
       char target_device[3]; 
-      memcpy(target_device, abc + 0 /* Offset */, 3 /* Length */);
+      memcpy(target_device, msg + 0 /* Offset */, 3 /* Length */);
       target_device[3] = 0; /* Add terminator */
       int target_device_ID;
       sscanf(target_device, "%d", &target_device_ID);
@@ -287,40 +289,36 @@ void loop(void)
       if (target_device_ID == NodeID)
       {
          printf("- Mine (SN=%i), start to process\r\n", target_device_ID); 
-         state = state_pong_back;         
+
+         printf("msg now: %s:", msg);
+         char target_command[32-4]; 
+         memcpy(target_command, msg + 2 /* Offset */, 32-4 /* Length */);
+         target_command[32-4] = 0; /* Add terminator */
+       
+         actuatorCommand(target_command);
+
+         // First, stop listening so we can talk
+         radio.stopListening();
+         Serial.print(F("Sending Confirmation response: "));
+         // Send the final one back.
+         sprintf(a, "%03i", NodeID);
+         sprintf(a + strlen(a), "_ack_%s;",msg);
+         printf("%s:", a);
+         sendMessage(a, sizeof(a));
+  
+         // Now, resume listening so we catch the next packets.
+         radio.startListening();
       }
       else
       {
          printf("- Not mine, but for SN=%i\r\n", target_device_ID); 
-         state = state_ping_out;         
       }
 
+      state = state_ping_out;         
     }
+   
+  }
     
-  }
-  
-  //
-  // Pong back state.  Receive each packet, dump it out, and send it back
-  //
-
-  if ( state == state_pong_back )
-  {
-      // First, stop listening so we can talk
-      radio.stopListening();
-
-      Serial.print(F("Sending Confirmation response: "));
-      
-      // Send the final one back.
-      sprintf(a, "%03i", NodeID);
-      sprintf(a + strlen(a), "_ack_%s;",abc);
-      printf("%s:", a);
-      sendMessage(a, sizeof(a));
-
-      // Now, resume listening so we catch the next packets.
-      radio.startListening();
-      state = state_ping_out;
-  }
-  
   delay(DELAY);
   
   iterations_count++;
@@ -538,3 +536,46 @@ unsigned int EEPROM_readint(int address) {
   return word;
 }
 
+
+int commandSize(char *ptr)
+{
+    //variable used to access the subsequent array elements.
+    int offset = 0;
+    //variable that counts the number of elements in your array
+    int count = 0;
+
+    //While loop that tests whether the end of the array has been reached
+    while (*(ptr + offset) != '\0')
+    {
+        //increment the count variable
+        ++count;
+        //advance to the next element of the array
+        ++offset;
+    }
+    //return the size of the array
+    return count;
+}
+
+void actuatorCommand(char* command)
+{
+   printf("   Execute Command: %s\r\n", command); 
+ 
+   if (strcmp(command, "SwitchOff") == 0)
+   {
+      digitalWrite(SWITCH_CONTROL, LOW);
+      printf("    c_Switch Off\r\n"); 
+   }
+   
+   if (strcmp(command, "SwitchOn") == 0)
+   {
+      digitalWrite(SWITCH_CONTROL, HIGH);
+      printf("    c_Switch On\r\n");       
+   }
+   
+   if (strcmp(command, "Reinitialize") == 0)
+   {
+      resetMeasurement();
+      printf("    c_Reset\r\n");       
+   }
+
+}
