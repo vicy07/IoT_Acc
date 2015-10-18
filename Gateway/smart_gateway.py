@@ -27,7 +27,7 @@ import RPi.GPIO as GPIO
 from azure.servicebus import ServiceBusService, Message, Queue
 
 import logging
-logging.basicConfig(level=logging.DEBUG, filename=os.path.dirname(os.path.abspath(__file__)) + '/last_error.log')
+logging.basicConfig(level=logging.ERROR, filename=os.path.dirname(os.path.abspath(__file__)) + '/last_error.log')
 
 ##############################
 #   Compute secured Hash     #
@@ -256,17 +256,16 @@ def main(argv):
           # if check timeout is gone go to Azure and grab command to execute
           tdelta = nowPI-cloudCommandLastCheck
           if (abs(tdelta.total_seconds()) > 90):
+             cloudCommandLastCheck = datetime.now()
              try:
                 cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
-             except:
-                continue
- 
-             cloudCommandLastCheck = datetime.now()
-             print 'Azure Command -> ',
-             if cloudCommand.body is not None:
+
+                while cloudCommand.body is not None:
+                   print 'Azure Command -> ',
+
                    stringCommand = str(cloudCommand.body)
                    print ' "' + stringCommand + '" => ',
-
+ 
                    #Tranlate External/Cloud ID to local network ID 
                    temp = stringCommand.split("-") 
                    localNetworkDeviceID = config_data["Devices"].keys()[config_data["Devices"].values().index(temp[0])]
@@ -274,8 +273,11 @@ def main(argv):
                    localCommandSendAckWaitList.append(str(localNetworkDeviceID + '-' + temp[1]))
                    print ' "' + localNetworkDeviceID + '-' + temp[1] + '"'
                    localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
-             else:
-                   print ' No Commands from Azure'
+
+                   cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+             except:
+                continue
+
 
           # Repeat sending/span commands while list is not empty
           for localCommand in localCommandSendAckWaitList:
