@@ -126,22 +126,6 @@ def main(argv):
    print '      Gateway ID:', config_data["Server"]["Deviceid"]
    print '     Service Bus:', config_data["Servicebus"]["namespace"]
 
-   queue_name = 'custom_' + config_data["Server"]["id"] + '_' + config_data["Server"]["Deviceid"]
-   bus_service = ServiceBusService( service_namespace=config_data["Servicebus"]["namespace"], 
-                                    shared_access_key_name=config_data["Servicebus"]["shared_access_key_name"], 
-                                    shared_access_key_value=config_data["Servicebus"]["shared_access_key_value"])
-   try:
-      bus_service.receive_queue_message(queue_name, peek_lock=False)
-      print '  Actuator queue: ' + queue_name
-   except:
-      queue_options = Queue()
-      queue_options.max_size_in_megabytes = '1024'
-      queue_options.default_message_time_to_live = 'PT15M'
-      bus_service.create_queue(queue_name, queue_options)
-      print '  Actuator queue: ' + queue_name + ' (Created)'
-
-
-
    print ''
    nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -158,6 +142,20 @@ def main(argv):
    else:
        print 'Error in setting time. Server response code: %i' % r.status_code
 
+   queue_name = 'custom_' + config_data["Server"]["id"] + '_' + config_data["Server"]["Deviceid"]
+   bus_service = ServiceBusService( service_namespace=config_data["Servicebus"]["namespace"], 
+                                    shared_access_key_name=config_data["Servicebus"]["shared_access_key_name"], 
+                                    shared_access_key_value=config_data["Servicebus"]["shared_access_key_value"])
+   try:
+      bus_service.receive_queue_message(queue_name, peek_lock=False)
+      print '  Actuator queue: ' + queue_name
+   except:
+      queue_options = Queue()
+      queue_options.max_size_in_megabytes = '1024'
+      queue_options.default_message_time_to_live = 'PT15M'
+      bus_service.create_queue(queue_name, queue_options)
+      print '  Actuator queue: ' + queue_name + ' (Created)'	   
+	   
    href = config_data["Server"]["url"] + 'api/Device/DeviceConfigurationUpdate'
    token = ComputeHash(nowPI, config_data["Server"]["key"])
    authentication = config_data["Server"]["id"] + ":" + token
