@@ -245,6 +245,12 @@ void loop(void)
       dealWithTempData(a, sizeof(a));
       rest();      
     }
+    
+    if(checkDHT(DHT_HEATING_PIN) == DHTLIB_OK)
+    {      
+      dealWithHeatingTempData(a, sizeof(a));
+      rest();      
+    }
 
     // Now, continue listening
     state = receive_data;
@@ -402,6 +408,28 @@ int dealWithTempData(char* a, unsigned int aLen)
   sprintf(a, "%03i", NodeID);
   sprintf(a + strlen(a), "_t_%02i;", value);
   Serial.print(F("Now sending \"TempData\": "));
+  printf("%s:", a);
+    
+  if (m_temp != value)  
+  {
+      sendMessage(a, aLen);
+      
+      m_temp = value;      
+  }
+  else
+  {
+     Serial.print(F("No changes.\r\n"));
+  }
+  
+  return value;
+}
+
+int dealWithHeatingTempData(char* a, unsigned int aLen)
+{
+  int value = (int)DHT.temperature;
+  sprintf(a, "%03i", NodeID);
+  sprintf(a + strlen(a), "_b_%02i;", value);
+  Serial.print(F("Now sending \"HeadingTempData\": "));
   printf("%s:", a);
     
   if (m_temp != value)  
