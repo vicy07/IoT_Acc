@@ -12,6 +12,7 @@
 //Control Values = 90 times
 #define RESET_Interval 500
 #define DHT_PIN 2
+#define DHT_HEATING_PIN 2
 #define PIR_PIN 4
 #define RESET_PIN 3
 #define SWITCH_CONTROL 5
@@ -236,7 +237,7 @@ void loop(void)
     dealWithLuxData(a, sizeof(a));
     rest();
  
-    if(checkDHT() == DHTLIB_OK)
+    if(checkDHT(DHT_PIN) == DHTLIB_OK)
     {      
       dealWithHumData(a, sizeof(a));
       rest();
@@ -329,17 +330,17 @@ void loop(void)
   
 }
 
-int checkDHT(void)
+int checkDHT(int pin)
 {
   int chk;
 
   ///If not clear sensor type validate it    
   if (m_DHT_sensor_type==-1)
   {
-    chk = DHT.read22(DHT_PIN);
+    chk = DHT.read22(pin);
     if (chk == DHTLIB_OK) m_DHT_sensor_type=1;
     
-    chk = DHT.read11(DHT_PIN);
+    chk = DHT.read11(pin);
     if (chk == DHTLIB_OK) m_DHT_sensor_type=0;
   }
   
@@ -347,10 +348,10 @@ int checkDHT(void)
   switch(m_DHT_sensor_type)
   {
     case 1: 
-       chk = DHT.read22(DHT_PIN);
+       chk = DHT.read22(pin);
        break;
     default:
-       chk = DHT.read11(DHT_PIN);
+       chk = DHT.read11(pin);
        break;
   };
 
