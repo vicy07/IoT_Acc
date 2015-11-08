@@ -59,6 +59,7 @@ dht DHT;
 
 
 int m_temp;
+int m_heating_temp;
 int m_humd;
 uint16_t m_lux;
 int m_pir;
@@ -432,11 +433,11 @@ int dealWithHeatingTempData(char* a, unsigned int aLen)
   Serial.print(F("Now sending \"HeadingTempData\": "));
   printf("%s:", a);
     
-  if (m_temp != value)  
+  if (m_heating_temp != value)  
   {
       sendMessage(a, aLen);
       
-      m_temp = value;      
+      m_heating_temp = value;      
   }
   else
   {
@@ -526,6 +527,7 @@ void resetMeasurement()
   m_humd = -1;
   m_lux = -1;
   m_pir = -1;
+  m_heating_temp = -1;
   iterations_count = 0;
   m_DHT_sensor_type = -1;
   
