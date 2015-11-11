@@ -247,10 +247,13 @@ void loop(void)
       rest();      
     }
     
-    if(checkDHT(DHT_HEATING_PIN) == DHTLIB_OK)
+    if (DHT_HEATING_PIN != DHT_PIN)
     {      
-      dealWithHeatingTempData(a, sizeof(a));
-      rest();      
+      if (checkDHT(DHT_HEATING_PIN) == DHTLIB_OK)
+      {
+         dealWithHeatingTempData(a, sizeof(a));
+         rest();      
+      }
     }
 
     // Now, continue listening
