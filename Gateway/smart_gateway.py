@@ -140,8 +140,6 @@ def main(argv):
    print ''
    nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-   print 'Time:', nowPI
-
    href = config_data["Server"]["url"] + 'API/Device/GetServerDateTime'
    token = ComputeHash(nowPI, config_data["Server"]["key"])
    authentication = config_data["Server"]["id"] + ':' + token
@@ -231,12 +229,11 @@ def main(argv):
    # List to hold all commands that was send no ACK received
    localCommandSendAckWaitList = []
    while True:
-       print ('while startTime ', datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
        pipe = [0]
        cloudCommand = ''
        while not radio.available(pipe, True):
            time.sleep(1)
-       time.sleep(1)
+
        recv_buffer = []
        radio.read(recv_buffer)
        out = ''.join(chr(i) for i in recv_buffer)
@@ -251,7 +248,6 @@ def main(argv):
           if debugMode == 1: print (temp)
     
           if temp[0] in config_data["Devices"]:
-             print temp
              if temp[1] == 'ack':
                # Clean list once ACK from SN is received
                 localCommandSendAckWaitList= [x for x in localCommandSendAckWaitList if x != temp[2]]
@@ -264,7 +260,6 @@ def main(argv):
              print '-> ignore'
 
        if queue_name <> '':
-          print 'Bus_Service'
           # if check timeout is gone go to Azure and grab command to execute
           tdelta = nowPI-cloudCommandLastCheck
           if (abs(tdelta.total_seconds()) > 10):
@@ -282,11 +277,9 @@ def main(argv):
              time.sleep(1)
              radio.startListening()
 
-          print ('EndWhile startTime ', datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
 
 def checkCloudCommand(bus_service, queue_name, localCommandSendAckWaitList, config_data):
      try:
-        print ('checkCloudCommandBus_Servicewhile startTime ', datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
         cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
         while cloudCommand.body is not None:
            print 'Azure Command -> '
