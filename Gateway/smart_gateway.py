@@ -11,7 +11,7 @@ import os
 import sys, getopt
 import json
 import requests
-
+from threading import Thread
 import hashlib
 import hmac
 import base64
@@ -25,9 +25,12 @@ from uuid import getnode as get_mac
 import RPi.GPIO as GPIO
 
 from azure.servicebus import ServiceBusService, Message, Queue
-
+from requests_futures.sessions import FuturesSession
 import logging
 logging.basicConfig(level=logging.ERROR, filename=os.path.dirname(os.path.abspath(__file__)) + '/last_error.log')
+
+
+session = FuturesSession(max_workers=10)
 
 ##############################
 #   Compute secured Hash     #
@@ -37,6 +40,10 @@ def ComputeHash(timeStamp, key):
     secret  = bytes(key).encode('utf-8')
     signature = base64.b64encode(hmac.new(message, secret, digestmod=hashlib.sha256).digest())
     return signature
+
+def bc_cb(sess, r):
+    print (r)
+    print '-> ' + str(r.status_code)
 
 
 ##############################
@@ -57,7 +64,11 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
 
     measure = {}
     measure["EventType"] = measures[measure_type]
-    measure["EventValue"] = int(measure_value)
+    try:
+        measure["EventValue"] = float(measure_value)
+    except:
+        measure["EventValue"] = 0
+        
     measure["EventTime"] = now_
     measurements.append(measure)
 
@@ -65,10 +76,10 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
 
     payload = {'events': measurements, "deviceId": deviceId}
     if debugMode == 1: print(json.dumps(payload))
+    
 #    r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
-    r = requests.post(href, headers=headers, data=json.dumps(payload))
-    if debugMode == 1: print (r)
-    else: print '-> ' + str(r.status_code)
+    session.post(href, headers=headers, data=json.dumps(payload))
+    #response.result()
 
 
 
@@ -129,6 +140,8 @@ def main(argv):
    print ''
    nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
+   print 'Time:', nowPI
+
    href = config_data["Server"]["url"] + 'API/Device/GetServerDateTime'
    token = ComputeHash(nowPI, config_data["Server"]["key"])
    authentication = config_data["Server"]["id"] + ':' + token
@@ -160,6 +173,7 @@ def main(argv):
    token = ComputeHash(nowPI, config_data["Server"]["key"])
    authentication = config_data["Server"]["id"] + ":" + token
 
+
    if debugMode==1: print(authentication)
    headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': nowPI, 'Authentication': authentication}
     
@@ -187,7 +201,7 @@ def main(argv):
                 json.dump(json.loads(entry['Value']), outfile)
       print 'Device configuration Successfully updated'
    else:
-      print 'Error in setting time. Server response code: {0} {1}'.format(r.status_code, r.content)
+      print 'Error in Device configuration update. Server response code: {0} {1}'.format(r.status_code, r.content)
 
 
    GPIO.setwarnings(False)
@@ -217,17 +231,18 @@ def main(argv):
    # List to hold all commands that was send no ACK received
    localCommandSendAckWaitList = []
    while True:
+       print ('while startTime ', datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
        pipe = [0]
        cloudCommand = ''
        while not radio.available(pipe, True):
            time.sleep(1)
-
+       time.sleep(1)
        recv_buffer = []
        radio.read(recv_buffer)
        out = ''.join(chr(i) for i in recv_buffer)
 
        nowPI = datetime.now()
- 
+       print localCommandSendAckWaitList
        if out.find(';')>0:
           out = out.split(';')[0]
           print out,
@@ -236,7 +251,7 @@ def main(argv):
           if debugMode == 1: print (temp)
     
           if temp[0] in config_data["Devices"]:
-
+             print temp
              if temp[1] == 'ack':
                # Clean list once ACK from SN is received
                 localCommandSendAckWaitList= [x for x in localCommandSendAckWaitList if x != temp[2]]
@@ -248,34 +263,15 @@ def main(argv):
           else:
              print '-> ignore'
 
-
-
        if queue_name <> '':
+          print 'Bus_Service'
           # if check timeout is gone go to Azure and grab command to execute
           tdelta = nowPI-cloudCommandLastCheck
-          if (abs(tdelta.total_seconds()) > 90):
+          if (abs(tdelta.total_seconds()) > 10):
              cloudCommandLastCheck = datetime.now()
-             try:
-                cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
-
-                while cloudCommand.body is not None:
-                   print 'Azure Command -> ',
-
-                   stringCommand = str(cloudCommand.body)
-                   print ' "' + stringCommand + '" => ',
- 
-                   #Tranlate External/Cloud ID to local network ID 
-                   temp = stringCommand.split("-") 
-                   localNetworkDeviceID = config_data["Devices"].keys()[config_data["Devices"].values().index(temp[0])]
-
-                   localCommandSendAckWaitList.append(str(localNetworkDeviceID + '-' + temp[1]))
-                   print ' "' + localNetworkDeviceID + '-' + temp[1] + '"'
-                   localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
-
-                   cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
-             except:
-                continue
-
+             thread = Thread(target=checkCloudCommand, args=(bus_service, queue_name, localCommandSendAckWaitList, config_data))
+             thread.start()
+            
 
           # Repeat sending/span commands while list is not empty
           for localCommand in localCommandSendAckWaitList:
@@ -285,6 +281,31 @@ def main(argv):
              print 'Broadcast Command locally: ' + localCommand 
              time.sleep(1)
              radio.startListening()
+
+          print ('EndWhile startTime ', datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+
+def checkCloudCommand(bus_service, queue_name, localCommandSendAckWaitList, config_data):
+     try:
+        print ('checkCloudCommandBus_Servicewhile startTime ', datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+        cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+        while cloudCommand.body is not None:
+           print 'Azure Command -> '
+
+           stringCommand = str(cloudCommand.body)
+           print ' "' + stringCommand + '" => ',
+
+           #Tranlate External/Cloud ID to local network ID 
+           temp = stringCommand.split("-")
+           print 'stringCommand.split = ', temp
+           localNetworkDeviceID = config_data["Devices"].keys()[config_data["Devices"].values().index(temp[0])]
+           print localNetworkDeviceID
+           localCommandSendAckWaitList.append(str(localNetworkDeviceID + '-' + temp[1]))
+           print ' "' + localNetworkDeviceID + '-' + temp[1] + '"'
+           localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
+           print localCommandSendAckWaitList
+           cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
+     except:
+        print 'bus_service.receive_queue_message throw an Exception'
 
 if __name__ == "__main__":
    try:

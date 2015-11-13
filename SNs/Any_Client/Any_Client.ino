@@ -103,6 +103,8 @@ void setup(void)
   
   pinMode(SWITCH_CONTROL, OUTPUT);
   digitalWrite(SWITCH_CONTROL, LOW);  
+
+  pinMode(DHT_PIN, INPUT);
   
 //  pinMode(RESET_PIN, INPUT);
 //  EEPROM_writelong(0,21);
