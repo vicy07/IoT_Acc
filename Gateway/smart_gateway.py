@@ -51,7 +51,7 @@ def bc_cb(sess, r):
 ##############################
 def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugMode=0):    
 
-    measures = { "t": "1", "h": 2, "p": "7", "l":"6", "b":"43", "live":"32" }
+    measures = { "t": "1", "h": 2, "p": "7", "l":"6", "b":"43", "live":"32" , "s":"44" }
 
     href = config_data["Server"]["url"] + 'api/events/process'
     token = ComputeHash(now_, config_data["Server"]["key"])

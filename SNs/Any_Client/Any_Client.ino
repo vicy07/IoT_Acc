@@ -63,6 +63,7 @@ int m_heating_temp;
 int m_humd;
 uint16_t m_lux;
 int m_pir;
+int m_switch;
 int m_DHT_sensor_type;
 int iterations_count;
 
@@ -105,6 +106,7 @@ void setup(void)
   digitalWrite(SWITCH_CONTROL, LOW);  
 
   pinMode(DHT_PIN, INPUT);
+  pinMode(DHT_HEATING_PIN, INPUT);
   
 //  pinMode(RESET_PIN, INPUT);
 //  EEPROM_writelong(0,21);
@@ -308,7 +310,7 @@ void loop(void)
          memcpy(target_command, msg + 2 /* Offset */, 32-4 /* Length */);
          target_command[32-4] = 0; /* Add terminator */
        
-         actuatorCommand(target_command);
+         m_switch = actuatorCommand(target_command);
 
          // First, stop listening so we can talk
          radio.stopListening();
@@ -316,6 +318,12 @@ void loop(void)
          // Send the final one back.
          sprintf(a, "%03i", NodeID);
          sprintf(a + strlen(a), "_ack_%s;",msg);
+         printf("%s:", a);
+         sendMessage(a, sizeof(a));
+
+         // Send switch state.
+         sprintf(a, "%03i", NodeID);
+         sprintf(a + strlen(a), "_s_%04i;",m_switch);
          printf("%s:", a);
          sendMessage(a, sizeof(a));
   
@@ -592,7 +600,7 @@ int commandSize(char *ptr)
     return count;
 }
 
-void actuatorCommand(char* command)
+int actuatorCommand(char* command)
 {
    printf("   Execute Command: %s\r\n", command); 
  
@@ -600,18 +608,21 @@ void actuatorCommand(char* command)
    {
       digitalWrite(SWITCH_CONTROL, LOW);
       printf("    c_Switch Off\r\n"); 
+      return 0;
    }
    
    if (strcmp(command, "SwitchOn") == 0)
    {
       digitalWrite(SWITCH_CONTROL, HIGH);
       printf("    c_Switch On\r\n");       
+      return 1;
    }
    
    if (strcmp(command, "Reinitialize") == 0)
    {
       resetMeasurement();
-      printf("    c_Reset\r\n");       
+      printf("    c_Reset\r\n");
+      return 1023;
    }
 
 }
