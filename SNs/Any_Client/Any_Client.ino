@@ -8,7 +8,7 @@
 #include <avr/pgmspace.h>
 
 //Validation for Sensors changes each 20 sec
-#define DELAY 2000
+#define DELAY 500
 //Control Values = 90 times
 #define RESET_Interval 500
 #define DHT_PIN 2
