@@ -77,12 +77,10 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
     payload = {'events': measurements, "deviceId": deviceId}
     if debugMode == 1: print(json.dumps(payload))
     
-#    r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
+    #r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
     session.post(href, headers=headers, data=json.dumps(payload))
     #response.result()
-
-
-
+    print 'C: Send to DeviceId=' + deviceId + ' type=' + str(measure["EventType"]) + ' value=' + str(measure["EventValue"])
 
 
 def main(argv):
@@ -231,18 +229,24 @@ def main(argv):
    while True:
        pipe = [0]
        cloudCommand = ''
+       nowPI = datetime.now()
        while not radio.available(pipe, True):
+           radioTime = datetime.now()
+           tdelta = nowPI-radioTime
            time.sleep(1)
+           if (abs(tdelta.total_seconds()) > 10): break
 
        recv_buffer = []
        radio.read(recv_buffer)
        out = ''.join(chr(i) for i in recv_buffer)
 
        nowPI = datetime.now()
-       print localCommandSendAckWaitList
+
+       if debugMode == 1: print localCommandSendAckWaitList
+
        if out.find(';')>0:
           out = out.split(';')[0]
-          print out,
+          print 'L: Received: ' + out
 
           temp =out.split("_")
           if debugMode == 1: print (temp)
@@ -254,7 +258,7 @@ def main(argv):
                 print '<- Broadcast complete, ACK received for: ' + temp[2]
              else:
                 sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), temp[1], temp[2], config_data["Devices"][temp[0]], debugMode)
-                print config_data["Server"]["Deviceid"] + '_live_1',
+                print 'L: Generated selfok'
                 sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'live', 1, config_data["Server"]["Deviceid"], debugMode)
           else:
              print '-> ignore'
@@ -273,7 +277,7 @@ def main(argv):
              radio.stopListening()
              buf = list(localCommand)
              radio.write(buf)
-             print 'Broadcast Command locally: ' + localCommand 
+             print 'L: Broadcast Command: ' + localCommand 
              time.sleep(1)
              radio.startListening()
 
@@ -282,20 +286,17 @@ def checkCloudCommand(bus_service, queue_name, localCommandSendAckWaitList, conf
      try:
         cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
         while cloudCommand.body is not None:
-           print 'Azure Command -> '
-
            stringCommand = str(cloudCommand.body)
-           print ' "' + stringCommand + '" => ',
+           print 'C: Received "' + stringCommand + '" => ',
 
            #Tranlate External/Cloud ID to local network ID 
            temp = stringCommand.split("-")
-           print 'stringCommand.split = ', temp
+           #print 'stringCommand.split = ', temp
            localNetworkDeviceID = config_data["Devices"].keys()[config_data["Devices"].values().index(temp[0])]
-           print localNetworkDeviceID
+           print 'for DeviceId=' + localNetworkDeviceID
            localCommandSendAckWaitList.append(str(localNetworkDeviceID + '-' + temp[1]))
-           print ' "' + localNetworkDeviceID + '-' + temp[1] + '"'
+           print 'L: Add command to Broadcast: "' + localNetworkDeviceID + '-' + temp[1] + '"'
            localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
-           print localCommandSendAckWaitList
            cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
      except:
         print 'bus_service.receive_queue_message throw an Exception'
