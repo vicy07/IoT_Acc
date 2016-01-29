@@ -270,8 +270,8 @@ def main(argv):
              cloudCommandLastCheck = datetime.now()
              thread = Thread(target=checkCloudCommand, args=(bus_service, queue_name, localCommandSendAckWaitList, config_data))
              thread.start()
-            
 
+          if debugMode == 1: print localCommandSendAckWaitList
           # Repeat sending/span commands while list is not empty
           for localCommand in localCommandSendAckWaitList:
              radio.stopListening()
@@ -285,7 +285,8 @@ def main(argv):
 def checkCloudCommand(bus_service, queue_name, localCommandSendAckWaitList, config_data):
      try:
         cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
-        while cloudCommand.body is not None:
+
+        if cloudCommand.body is not None:
            stringCommand = str(cloudCommand.body)
            print 'C: Received "' + stringCommand + '" => ',
 
@@ -297,7 +298,6 @@ def checkCloudCommand(bus_service, queue_name, localCommandSendAckWaitList, conf
            localCommandSendAckWaitList.append(str(localNetworkDeviceID + '-' + temp[1]))
            print 'L: Add command to Broadcast: "' + localNetworkDeviceID + '-' + temp[1] + '"'
            localCommandSendAckWaitList = list(set(localCommandSendAckWaitList))
-           cloudCommand = bus_service.receive_queue_message(queue_name, peek_lock=False)
      except:
         print 'bus_service.receive_queue_message throw an Exception'
 
