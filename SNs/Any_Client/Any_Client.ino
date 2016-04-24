@@ -11,10 +11,11 @@
 #define DELAY 500
 //Control Values = 90 times
 #define RESET_Interval 500
+#define RESET_PIN 3
+
 #define DHT_PIN 2
 #define DHT_HEATING_PIN 2
 #define PIR_PIN 4
-#define RESET_PIN 3
 #define SWITCH_CONTROL 5
 #define INDICATION_PIN 8
 
@@ -27,13 +28,16 @@ int BH1750address = 0x23;
 BH1750 LightSensor;
 
 int NodeID;
+// Define sensors connection to pins
+// TODO: Move it to EPROM to make code fully independent
+   int sensors_DHT_connection_bit = 256 * B0000000 + B0000010;
+   int sensors_PIR_connection_bit = 256 * B0000000 + B0001000;
+int sensors_SWITCH_connection_bit = 256 * B0000000 + B0010000;
+   int sensors_LED_connection_bit = 256 * B0000000 + B1000000;
+
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
 RF24 radio(9,10);
-//7,10
-//
-// Topology
-//
 
 // Radio pipe addresses for the 2 nodes to communicate.
                         //Writing Pipe   //Command Listening & Registration Pipe
@@ -96,24 +100,30 @@ void setup(void)
   radio.startListening();
   radio.printDetails();
 
+//  EEPROM_writelong(0,297);
   NodeID=(int)EEPROM_readlong(0);
   printf("DeviceId=%03i - Read from Memory\r\n", NodeID);
   
-  pinMode(PIR_PIN, INPUT);  
-  digitalWrite(PIR_PIN, HIGH);
-  
-  pinMode(SWITCH_CONTROL, OUTPUT);
-  digitalWrite(SWITCH_CONTROL, LOW);  
+  //All Sensors and INPUT PINS define
+  for (int n=1; n<=16; ++n)
+  {
+    if ((sensors_DHT_connection_bit|sensors_PIR_connection_bit) & (1<<(n-1))) 
+    { 
+      pinMode(n, INPUT);
+      digitalWrite(n, LOW);      
+    }
+  }
 
-  pinMode(DHT_PIN, INPUT);
-  pinMode(DHT_HEATING_PIN, INPUT);
+  //All Sensors and OUTPUT PINS define
+  for (int n=1; n<=16; ++n)
+  {
+    if ((sensors_LED_connection_bit|sensors_SWITCH_connection_bit) & (1<<(n-1))) 
+    { 
+      pinMode(n, OUTPUT);
+      digitalWrite(n, LOW);      
+    }
+  }
   
-//  pinMode(RESET_PIN, INPUT);
-//  EEPROM_writelong(0,21);
-//  pinMode(RESET_PIN, INPUT_PULLUP);
-//  digitalWrite(RESET_PIN, LOW);
-  pinMode(INDICATION_PIN, OUTPUT);
-
   randomSeed(analogRead(0));
   
   resetMeasurement();
@@ -489,32 +499,34 @@ uint16_t dealWithLuxData(char* a, unsigned int aLen)
   return value;
 }
 
-bool dealWithPIRData(char* a, unsigned int aLen)
+void dealWithPIRData(char* a, unsigned int aLen)
 {
-  int value = digitalRead(PIR_PIN);
-  sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_p_%01i;", value);
-  Serial.print(F("Now sending "));
-  printf("%s:", a);
-
-  digitalWrite(INDICATION_PIN, value); 
-
-#if (DEBUG!=1)  
-  if (m_pir != value)  
-#endif
+  
+  for (int n=1; n<=16; ++n)
   {
-    sendMessage(a, aLen);
-      
-    m_pir = value;            
-  }
-#if (DEBUG!=1) 
-  else
-  {
-     Serial.print(F("No changes.\r\n"));
-  }
-#endif
+    if ((sensors_PIR_connection_bit) & (1<<(n-1))) 
+    { 
+       int value = digitalRead(PIR_PIN);
+       sprintf(a, "%03i", NodeID);
+       sprintf(a + strlen(a), "_p_%01i", value);
+       sprintf(a + strlen(a), "_%01i;", n);       
+       Serial.print(F("Now sending "));
+       printf("%s:", a);
 
-  return value;
+       digitalWrite(INDICATION_PIN, value); 
+
+       if (m_pir != value)  
+       {
+           sendMessage(a, aLen);
+           m_pir = value;            
+       }
+       else
+       {
+           Serial.print(F("No changes.\r\n"));
+       }
+    }
+  }
+  
 }
 
 void rest()
@@ -543,6 +555,7 @@ void resetMeasurement()
   m_heating_temp = -1;
   iterations_count = 0;
   m_DHT_sensor_type = -1;
+  m_switch = -1;
   
   Serial.print(F("Refresh values\n\r"));
 }
