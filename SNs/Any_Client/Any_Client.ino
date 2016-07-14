@@ -1,4 +1,3 @@
-#include <Wire.h>
 #include <SPI.h>
 #include "RF24.h"
 #include "printf.h"
@@ -201,29 +200,16 @@ void loop(void)
       Serial.print(F("\n\r"));
       Serial.print(F("-----------------------------------\n\r"));
       
-      sprintf(a, "?");  
-      sprintf(a + strlen(a), "r_v01_%03i", handshakeID);
+      sprintf(a, "???");  
+      sprintf(a + strlen(a), "_v02_%03i;", handshakeID);
       Serial.print(F("Registration: Request "));
       printf("%s:", a);
+      sendMessage(a, sizeof(a));
       
       bool mineIDConfirmation = false;
       while (!mineIDConfirmation)
       {
         int retrycount = 0;
-        
-        rest();
-        delay(RETRY_TIMEOUT);
-        
-        if (radio.write(a, sizeof(a)))
-          Serial.print(F("ok."));
-        else
-        {
-          Serial.print(F("."));
-          continue;
-        }
-
-        Serial.print(F("\n\r"));
-
         radio.startListening();
       
         Serial.print(F("Starting registartion with ID:"));

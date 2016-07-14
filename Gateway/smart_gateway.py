@@ -261,7 +261,10 @@ def main(argv):
                 print 'L: Generated selfok'
                 sendMeasure(config_data, nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'live', 1, config_data["Server"]["Deviceid"], debugMode)
           else:
-             print '-> ignore'
+             if temp[0] == '???':
+                 print 'New Device Registration, HandshakeID=' + temp[2]
+             else:
+                 print '-> ignore'
 
        if queue_name <> '':
           # if check timeout is gone go to Azure and grab command to execute
