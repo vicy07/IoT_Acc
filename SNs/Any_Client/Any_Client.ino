@@ -1,4 +1,3 @@
-#include <BH1750.h>
 #include <Wire.h>
 #include <SPI.h>
 #include "RF24.h"
@@ -7,33 +6,27 @@
 #include <EEPROM.h>
 #include <avr/pgmspace.h>
 
+#define DEBUG 0
+
 //Validation for Sensors changes each 20 sec
 #define DELAY 500
-//Control Values = 90 times
-#define RESET_Interval 500
-#define RESET_PIN 3
+#define REFRESH_Interval 500
 
-#define DHT_PIN 2
-#define DHT_HEATING_PIN 2
-#define PIR_PIN 4
-#define SWITCH_CONTROL 5
-#define INDICATION_PIN 8
+#define RESET_PIN 7
+#define SWITCH_CONTROL 2
+#define INDICATION_PIN 4
 
-#define DEBUG 0
+int NodeID;
 
 const char timed_out[] PROGMEM = "Time out error!\r\n";
 const char checksum_err[] PROGMEM = "Checksum error!\r\n";
 
-int BH1750address = 0x23;
-BH1750 LightSensor;
-
-int NodeID;
 // Define sensors connection to pins
 // TODO: Move it to EPROM to make code fully independent
-   int sensors_DHT_connection_bit = 256 * B0000000 + B0000010;
-   int sensors_PIR_connection_bit = 256 * B0000000 + B0001000;
-int sensors_SWITCH_connection_bit = 256 * B0000000 + B0010000;
-   int sensors_LED_connection_bit = 256 * B0000000 + B1000000;
+   int sensors_DHT_connection_bit = 256 * B0000000 + B0100000;
+   int sensors_PIR_connection_bit = 256 * B0000000 + B0000100;
+int sensors_SWITCH_connection_bit = 256 * B0000000 + B0000010;
+   int sensors_LED_connection_bit = 256 * B0000000 + B0001000;
 
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
@@ -60,7 +53,7 @@ const char* state_friendly_name[] = { "invalid", "Ping out", "Pong back", "Regis
 //state_e state = state_ping_out;
 state_e state = state_initial;
 dht DHT;
-
+int m_DHT_sensor_type = -1;  //0 - 11, 1 - 21, 2 - 22
 
 int m_temp;
 int m_heating_temp;
@@ -68,13 +61,11 @@ int m_humd;
 uint16_t m_lux;
 int m_pir;
 int m_switch;
-int m_DHT_sensor_type;
 int iterations_count;
 
 void setup(void)
 { 
-  Serial.begin(9600);
-  LightSensor.begin(BH1750_CONTINUOUS_HIGH_RES_MODE);
+  Serial.begin(115200);
   
   printf_begin();
   Serial.print(F("\n\rRF24/examples/GettingStarted/\n\r"));
@@ -100,7 +91,7 @@ void setup(void)
   radio.startListening();
   radio.printDetails();
 
-//  EEPROM_writelong(0,297);
+//  EEPROM_writelong(0,99);
   NodeID=(int)EEPROM_readlong(0);
   printf("DeviceId=%03i - Read from Memory\r\n", NodeID);
   
@@ -126,6 +117,33 @@ void setup(void)
   
   randomSeed(analogRead(0));
   
+  printf("DHT LIBRARY VERSION: %s \r\n", DHT_LIB_VERSION);
+  for (int n=1; n<=16; ++n)
+  {
+    if ((sensors_DHT_connection_bit) & (1<<(n-1))) 
+    {   
+       int chk = DHT.read11(n);
+       if (chk == DHTLIB_OK)
+       {
+          m_DHT_sensor_type = 0;
+       }
+       
+       chk = DHT.read21(n);
+       if (chk == DHTLIB_OK)
+       {
+         m_DHT_sensor_type = 1;
+       }
+       
+       chk = DHT.read22(n);
+       if (chk == DHTLIB_OK)
+       {
+         m_DHT_sensor_type = 2;
+       }
+       
+       printf("DHT Sensor Type: %01i connected to pin %02i \r\n", m_DHT_sensor_type, n);
+    }
+  }
+  
   resetMeasurement();
 }
 
@@ -150,6 +168,27 @@ void loop(void)
     {
       state = state_registration;
     }
+  }
+  
+  if (digitalRead(RESET_PIN) == HIGH)
+  {
+      int count=0;
+      printf("Reset countdown: ", count);
+      while (digitalRead(RESET_PIN) == HIGH) 
+      {
+         count+=1; 
+         delay(DELAY);
+         printf(".");
+      }
+
+      printf(":Final Count: %02i\n\r", count);      
+      if (count >= 10)
+      {
+         printf("-----------------------------------------------------\n\r");
+         printf("              Reinitialization initiated             \n\r");      
+         printf("-----------------------------------------------------\n\r");
+         state = state_registration;
+      }
   }
 
   if ( state == state_registration )
@@ -249,34 +288,16 @@ void loop(void)
     dealWithPIRData(a, sizeof(a));            
     rest();
 
-    dealWithLuxData(a, sizeof(a));
+    dealWithDHTData(a, sizeof(a));
     rest();
- 
-    if(checkDHT(DHT_PIN) == DHTLIB_OK)
-    {      
-      dealWithHumData(a, sizeof(a));
-      rest();
-
-      dealWithTempData(a, sizeof(a));
-      rest();      
-    }
-    
-    if (DHT_HEATING_PIN != DHT_PIN)
-    {      
-      if (checkDHT(DHT_HEATING_PIN) == DHTLIB_OK)
-      {
-         dealWithHeatingTempData(a, sizeof(a));
-         rest();      
-      }
-    }
-
+   
     // Now, continue listening
     state = receive_data;
     
-  }//if (state == state_ping_out)
-  
-
+  }  
   rest();  
+  
+  
   if (state == receive_data)
   {
     int retrycount = 0;
@@ -353,151 +374,99 @@ void loop(void)
   delay(DELAY);
   
   iterations_count++;
-  if (iterations_count>=RESET_Interval)
+  if (iterations_count>=REFRESH_Interval)
   {
      resetMeasurement();
   }
   
 }
 
-int checkDHT(int pin)
+void dealWithDHTData(char* a, unsigned int aLen)
 {
-  int chk;
-
-  ///If not clear sensor type validate it    
-  if (m_DHT_sensor_type==-1)
+  for (int n=1; n<=16; ++n)
   {
-    chk = DHT.read22(pin);
-    if (chk == DHTLIB_OK) m_DHT_sensor_type=1;
-    
-    chk = DHT.read11(pin);
-    if (chk == DHTLIB_OK) m_DHT_sensor_type=0;
-  }
+    if ((sensors_DHT_connection_bit) & (1<<(n-1))) 
+    { 
+        int chk;
+
+        chk = DHT.read11(n);
+        
+        //could not calculate DHT sensor type
+//        switch (m_DHT_sensor_type)
+//        {
+//            case 0: 
+//              chk = DHT.read11(n);
+//              break;
+//            case 1: 
+//              chk = DHT.read21(n);
+//              break;
+//            case 2: 
+//              chk = DHT.read22(n);
+//              break;              
+//            default: 
+//              Serial.print(F("Unknown DHT Sensor type!\r\n")); 
+//              break;
+//        }
+            
+        if (chk == DHTLIB_OK) 
+        {
+          int value = (int)DHT.humidity;
+          sprintf(a, "%03i", NodeID);
+          sprintf(a + strlen(a), "_h_%02i", value);
+          sprintf(a + strlen(a), "_%01i;", n);
+          Serial.print(F("Now sending \"HumData\": "));
+          printf("%s:", a);
   
-  ///If Type is clear read it properly
-  switch(m_DHT_sensor_type)
-  {
-    case 1: 
-       chk = DHT.read22(pin);
-       break;
-    default:
-       chk = DHT.read11(pin);
-       break;
-  };
+          if (m_humd != value)  
+          {
+              sendMessage(a, aLen);
+              
+              m_humd = value;
+          }    
+          else
+          {
+             Serial.print(F("No changes.\r\n"));
+          }
 
-  ///If Type is clear and reading failed report error
-  switch (chk)
-  {
-    case DHTLIB_OK:  
-      Serial.print(F("DHT Sensor is OK.\r\n")); 
-      break;
-    case DHTLIB_ERROR_CHECKSUM: 
-      printf("%s", checksum_err); 
-      break;
-    case DHTLIB_ERROR_TIMEOUT: 
-      printf("%s", timed_out); 
-      break;
-    default: 
-      Serial.print(F("Unknown error!\r\n")); 
-      break;
-  }
-  return chk;
-}
-
-int dealWithHumData(char* a, unsigned int aLen)
-{
-  int value = (int)DHT.humidity;
-  sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_h_%02i;", value);
-  Serial.print(F("Now sending \"HumData\": "));
-  printf("%s:", a);
-    
-  if (m_humd != value)  
-  {
-      sendMessage(a, aLen);
-      
-      m_humd = value;
-  }    
-  else
-  {
-     Serial.print(F("No changes.\r\n"));
-  }
-  
-  return value;    
-}
-
-int dealWithTempData(char* a, unsigned int aLen)
-{
-  int value = (int)DHT.temperature;
-  sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_t_%02i;", value);
-  Serial.print(F("Now sending \"TempData\": "));
-  printf("%s:", a);
-    
-  if (m_temp != value)  
-  {
-      sendMessage(a, aLen);
-      
-      m_temp = value;      
-  }
-  else
-  {
-     Serial.print(F("No changes.\r\n"));
-  }
-  
-  return value;
-}
-
-int dealWithHeatingTempData(char* a, unsigned int aLen)
-{
-  int value = (int)DHT.temperature;
-  sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_b_%02i;", value);
-  Serial.print(F("Now sending \"HeadingTempData\": "));
-  printf("%s:", a);
-    
-  if (m_heating_temp != value)  
-  {
-      sendMessage(a, aLen);
-      
-      m_heating_temp = value;      
-  }
-  else
-  {
-     Serial.print(F("No changes.\r\n"));
-  }
-  
-  return value;
-}
-
-uint16_t dealWithLuxData(char* a, unsigned int aLen)
-{
-  uint16_t value = LightSensor.readLightLevel();
-  sprintf(a, "%03i", NodeID);
-  sprintf(a + strlen(a), "_l_%i;", value);
-  Serial.print(F("Now sending "));
-  printf("%s:", a);
-    
-  if (m_lux != value)  
-  {
-    if ((value>=0)&&(value<=5000))
-    {
-        sendMessage(a, aLen);
+          value = (int)DHT.temperature;
+          sprintf(a, "%03i", NodeID);
+          sprintf(a + strlen(a), "_t_%02i", value);
+          sprintf(a + strlen(a), "_%01i;", n);          
+          Serial.print(F("Now sending \"TempData\": "));
+          printf("%s:", a);
+        
+          if (m_temp != value)  
+          {
+              sendMessage(a, aLen);
+          
+              m_temp = value;      
+          }
+          else
+          {
+             Serial.print(F("No changes.\r\n"));
+          } 
+        }
+        else
+        {
+            ///If Type is clear and reading failed report error
+            switch (chk)
+            {
+              case DHTLIB_ERROR_CHECKSUM: 
+                printf("%s", checksum_err); 
+                break;
+              case DHTLIB_ERROR_TIMEOUT: 
+                printf("%s", timed_out); 
+                break;
+              default: 
+                Serial.print(F("Unknown error!\r\n")); 
+                break;
+            }
+        }
     }
-    else
-    {
-        Serial.print(F("Not Connected.\n\r")); 
-    }
-    
-    m_lux = value;      
   }
-  else
-  {
-     Serial.print(F("No changes.\r\n"));
-  }
-  
-  return value;
 }
+
+
 
 void dealWithPIRData(char* a, unsigned int aLen)
 {
@@ -506,7 +475,7 @@ void dealWithPIRData(char* a, unsigned int aLen)
   {
     if ((sensors_PIR_connection_bit) & (1<<(n-1))) 
     { 
-       int value = digitalRead(PIR_PIN);
+       int value = digitalRead(n);
        sprintf(a, "%03i", NodeID);
        sprintf(a + strlen(a), "_p_%01i", value);
        sprintf(a + strlen(a), "_%01i;", n);       
@@ -554,7 +523,6 @@ void resetMeasurement()
   m_pir = -1;
   m_heating_temp = -1;
   iterations_count = 0;
-  m_DHT_sensor_type = -1;
   m_switch = -1;
   
   Serial.print(F("Refresh values\n\r"));
