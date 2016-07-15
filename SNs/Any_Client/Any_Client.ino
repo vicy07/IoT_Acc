@@ -176,6 +176,19 @@ void loop(void)
       while (digitalRead(RESET_PIN) == HIGH) 
       {
          count+=1; 
+         if (count % 2)
+         {
+           digitalWrite(INDICATION_PIN, HIGH); 
+         }
+         else
+         {
+           digitalWrite(INDICATION_PIN, LOW); 
+         }
+
+         if (count >= 10)
+         {
+           digitalWrite(INDICATION_PIN, LOW); 
+         }  
          delay(DELAY);
          printf(".");
       }

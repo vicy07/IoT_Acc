@@ -78,10 +78,34 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
     if debugMode == 1: print(json.dumps(payload))
     
     #r = requests.post(href, headers=headers, data=json.dumps(payload), verify=False)
-    session.post(href, headers=headers, data=json.dumps(payload))
+    response = session.post(href, headers=headers, data=json.dumps(payload))
     #response.result()
     print 'C: Send to DeviceId=' + deviceId + ' type=' + str(measure["EventType"]) + ' value=' + str(measure["EventValue"])
 
+
+######################################
+# Gerister Connected Sensor in Cloud #
+######################################
+def sendSensorRegistration(config_data, now_, sensorName, debugMode=1):    
+
+    href = config_data["Server"]["url"] + 'api/Device/DeviceRegister'
+    token = ComputeHash(now_, config_data["Server"]["key"])
+    authentication = config_data["Server"]["id"] + ":" + token
+
+    if debugMode == 1: print(authentication)
+    
+    headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Timestamp': now_, 'Authentication': authentication}
+
+    device = {}
+    device["DeviceType"] = 'Custom'
+    device["Name"] = sensorName
+    device["GatewayId"] = config_data["Server"]["Deviceid"]
+        
+    payload = {'Device': device}
+    if debugMode == 1: print(json.dumps(payload))
+    
+    response = session.post(href, headers=headers, data=json.dumps(payload))
+    print 'C: Send to New Sensor Registraton for Gateway=' + config_data["Server"]["Deviceid"] + ' name=' + sensorName + ' Response Code=' + str(response.result())
 
 def main(argv):
    print '##################################################################'
@@ -263,6 +287,7 @@ def main(argv):
           else:
              if temp[0] == '???':
                  print 'New Device Registration, HandshakeID=' + temp[2]
+                 sendSensorRegistration(config_data,  nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'new custom device (' + temp[2] + ')')
              else:
                  print '-> ignore'
 
