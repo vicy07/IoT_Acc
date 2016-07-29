@@ -23,6 +23,7 @@ import socket
 from uuid import getnode as get_mac
 
 import RPi.GPIO as GPIO
+import random
 
 from azure.servicebus import ServiceBusService, Message, Queue
 from requests_futures.sessions import FuturesSession
@@ -104,8 +105,31 @@ def sendSensorRegistration(config_data, now_, sensorName, debugMode=1):
     payload = {'Device': device}
     if debugMode == 1: print(json.dumps(payload))
     
-    response = session.post(href, headers=headers, data=json.dumps(payload))
-    print 'C: Send to New Sensor Registraton for Gateway=' + config_data["Server"]["Deviceid"] + ' name=' + sensorName + ' Response Code=' + str(response.result())
+    response = requests.post(href, headers=headers, data=json.dumps(payload), verify=True)
+    print 'C: Send to New Sensor Registraton for Gateway=' + config_data["Server"]["Deviceid"] + ' name=' + sensorName + ' Response Code=' + str(response.status_code)
+
+    if (response.status_code == 200):
+       print response.json()
+       registration_ticket = response.json()
+       serverId=registration_ticket["Device"]["DeviceIdentifier"]
+       print 'Server issued DeviceId:' + serverId
+
+       configFileName = os.path.dirname(os.path.abspath(__file__)) + '/config.json'
+       json_data=open(configFileName)
+       config_data_temp = json.load(json_data)
+       json_data.close()
+
+       localId=str(random.randint(1, 999))
+       while localId in config_data_temp["Devices"]:
+          localId=str(random.randint(1, 999))
+
+       print 'Local issued DeviceId:' + localId
+
+       config_data_temp["Devices"][localId] = serverId
+
+       with open(configFileName+'_', 'w') as outfile:
+          json.dump(config_data_temp, outfile)
+       print 'Configuration file succesfully updated!'
 
 def main(argv):
    print '##################################################################'
