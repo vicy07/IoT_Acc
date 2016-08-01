@@ -127,9 +127,13 @@ def sendSensorRegistration(config_data, now_, sensorName, debugMode=1):
 
        config_data_temp["Devices"][localId] = serverId
 
-       with open(configFileName+'_', 'w') as outfile:
+       with open(configFileName, 'w') as outfile:
           json.dump(config_data_temp, outfile)
+
+       return localId
        print 'Configuration file succesfully updated!'
+    else:
+       return 0
 
 def main(argv):
    print '##################################################################'
@@ -311,7 +315,13 @@ def main(argv):
           else:
              if temp[0] == '???':
                  print 'New Device Registration, HandshakeID=' + temp[2]
-                 sendSensorRegistration(config_data,  nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'new custom device (' + temp[2] + ')')
+                 localId = sendSensorRegistration(config_data,  nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'new custom device (' + temp[2] + ')')
+                 if localId != 0:
+                      localCommandSendAckWaitList.append('???_v02_' + temp[2] + '_' + localId) 
+                      # Reload config data as we succesfully registered new device
+                      json_data=open(configFileName)
+                      config_data = json.load(json_data)
+                      json_data.close()
              else:
                  print '-> ignore'
 
