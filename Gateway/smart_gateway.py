@@ -55,7 +55,7 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
     measures = { "t": "1", "h": 2, "p": "7", "l":"6", "b":"43", "live":"32" , "s":"44" }
 
     href = config_data["Server"]["url"] + 'api/events/process'
-    token = ComputeHash(now_, config_data["Server"]["key"])
+    token = config_data["Server"]["key"]
     authentication = config_data["Server"]["id"] + ":" + token
 
     if debugMode == 1: print(authentication)
@@ -90,7 +90,7 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
 def sendSensorRegistration(config_data, now_, sensorName, debugMode=1):    
 
     href = config_data["Server"]["url"] + 'api/Device/DeviceRegister'
-    token = ComputeHash(now_, config_data["Server"]["key"])
+    token = config_data["Server"]["key"]
     authentication = config_data["Server"]["id"] + ":" + token
 
     if debugMode == 1: print(authentication)
@@ -191,7 +191,7 @@ def main(argv):
    nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
    href = config_data["Server"]["url"] + 'API/Device/GetServerDateTime'
-   token = ComputeHash(nowPI, config_data["Server"]["key"])
+   token = config_data["Server"]["key"]
    authentication = config_data["Server"]["id"] + ':' + token
    headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Authentication': authentication}
    #r = requests.get(href, headers=headers, verify=False)
@@ -218,7 +218,7 @@ def main(argv):
       print '  Actuator queue: ' + queue_name + ' (Created)'	   
 	   
    href = config_data["Server"]["url"] + 'api/Device/DeviceConfigurationUpdate'
-   token = ComputeHash(nowPI, config_data["Server"]["key"])
+   token = config_data["Server"]["key"]
    authentication = config_data["Server"]["id"] + ":" + token
 
 
