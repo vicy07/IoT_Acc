@@ -23,6 +23,7 @@ import socket
 from uuid import getnode as get_mac
 
 import RPi.GPIO as GPIO
+import random
 
 from azure.servicebus import ServiceBusService, Message, Queue
 from requests_futures.sessions import FuturesSession
@@ -54,7 +55,7 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
     measures = { "t": "1", "h": 2, "p": "7", "l":"6", "b":"43", "live":"32" , "s":"44" }
 
     href = config_data["Server"]["url"] + 'api/events/process'
-    token = ComputeHash(now_, config_data["Server"]["key"])
+    token = config_data["Server"]["key"]
     authentication = config_data["Server"]["id"] + ":" + token
 
     if debugMode == 1: print(authentication)
@@ -89,7 +90,7 @@ def sendMeasure(config_data, now_, measure_type, measure_value, deviceId, debugM
 def sendSensorRegistration(config_data, now_, sensorName, debugMode=1):    
 
     href = config_data["Server"]["url"] + 'api/Device/DeviceRegister'
-    token = ComputeHash(now_, config_data["Server"]["key"])
+    token = config_data["Server"]["key"]
     authentication = config_data["Server"]["id"] + ":" + token
 
     if debugMode == 1: print(authentication)
@@ -104,8 +105,35 @@ def sendSensorRegistration(config_data, now_, sensorName, debugMode=1):
     payload = {'Device': device}
     if debugMode == 1: print(json.dumps(payload))
     
-    response = session.post(href, headers=headers, data=json.dumps(payload))
-    print 'C: Send to New Sensor Registraton for Gateway=' + config_data["Server"]["Deviceid"] + ' name=' + sensorName + ' Response Code=' + str(response.result())
+    response = requests.post(href, headers=headers, data=json.dumps(payload), verify=True)
+    print 'C: Send to New Sensor Registraton for Gateway=' + config_data["Server"]["Deviceid"] + ' name=' + sensorName + ' Response Code=' + str(response.status_code)
+
+    if (response.status_code == 200):
+       print response.json()
+       registration_ticket = response.json()
+       serverId=registration_ticket["Device"]["DeviceIdentifier"]
+       print 'Server issued DeviceId:' + serverId
+
+       configFileName = os.path.dirname(os.path.abspath(__file__)) + '/config.json'
+       json_data=open(configFileName)
+       config_data_temp = json.load(json_data)
+       json_data.close()
+
+       localId=str(random.randint(1, 999))
+       while localId in config_data_temp["Devices"]:
+          localId=str(random.randint(1, 999))
+
+       print 'Local issued DeviceId:' + localId
+
+       config_data_temp["Devices"][localId] = serverId
+
+       with open(configFileName, 'w') as outfile:
+          json.dump(config_data_temp, outfile)
+
+       return localId
+       print 'Configuration file succesfully updated!'
+    else:
+       return 0
 
 def main(argv):
    print '##################################################################'
@@ -163,7 +191,7 @@ def main(argv):
    nowPI = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
    href = config_data["Server"]["url"] + 'API/Device/GetServerDateTime'
-   token = ComputeHash(nowPI, config_data["Server"]["key"])
+   token = config_data["Server"]["key"]
    authentication = config_data["Server"]["id"] + ':' + token
    headers = {'Content-Type': 'application/json; charset=utf-8', 'Accept': 'application/json', 'Authentication': authentication}
    #r = requests.get(href, headers=headers, verify=False)
@@ -190,7 +218,7 @@ def main(argv):
       print '  Actuator queue: ' + queue_name + ' (Created)'	   
 	   
    href = config_data["Server"]["url"] + 'api/Device/DeviceConfigurationUpdate'
-   token = ComputeHash(nowPI, config_data["Server"]["key"])
+   token = config_data["Server"]["key"]
    authentication = config_data["Server"]["id"] + ":" + token
 
 
@@ -287,7 +315,13 @@ def main(argv):
           else:
              if temp[0] == '???':
                  print 'New Device Registration, HandshakeID=' + temp[2]
-                 sendSensorRegistration(config_data,  nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'new custom device (' + temp[2] + ')')
+                 localId = sendSensorRegistration(config_data,  nowPI.strftime("%Y-%m-%dT%H:%M:%S"), 'new custom device (' + temp[2] + ')')
+                 if localId != 0:
+                      localCommandSendAckWaitList.append('???_v02_' + temp[2] + '_' + localId) 
+                      # Reload config data as we succesfully registered new device
+                      json_data=open(configFileName)
+                      config_data = json.load(json_data)
+                      json_data.close()
              else:
                  print '-> ignore'
 

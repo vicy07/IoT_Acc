@@ -225,7 +225,7 @@ void loop(void)
         int retrycount = 0;
         radio.startListening();
       
-        Serial.print(F("Starting registartion with ID:"));
+        Serial.print(F("Waiting registartion ack with ID:"));
         printf("%i\r\n", handshakeID);
         
         while (!radio.available())
@@ -249,15 +249,27 @@ void loop(void)
         Serial.print(F("Received: "));
         printf("%s\r\n", abc);
         
-        // Dump the payloads until we've got everything
-        unsigned long deviceIdReceived = atoi(abc);
-  
+        
+        char handshakeConfirmation_raw[3]; 
+        memcpy(handshakeConfirmation_raw, abc + 8 /* Offset */, 3 /* Length */);
+        handshakeConfirmation_raw[3] = 0; /* Add terminator */
+        printf("RECEIVED CONFIRMATION:%s\r\n", handshakeConfirmation_raw);
+        int handshakeConfirmation;
+        sscanf(handshakeConfirmation_raw, "%d", &handshakeConfirmation);        
+
+        char deviceIdReceived_raw[3]; 
+        memcpy(deviceIdReceived_raw, abc + 12 /* Offset */, 3 /* Length */);
+        deviceIdReceived_raw[3] = 0; /* Add terminator */
+        printf("RECEIVED Local ID:%s\r\n", deviceIdReceived_raw);
+        int deviceIdReceived;
+        sscanf(deviceIdReceived_raw, "%d", &deviceIdReceived);        
+
         // Spew it
-        if ((int)handshakeID==(int)deviceIdReceived)
+        if ((int)handshakeID==(int)handshakeConfirmation)
         {
            /////NB assumption that we will use 4 bytes for data in eprom
-           EEPROM_writelong(0,deviceIdReceived);
-           NodeID=deviceIdReceived;
+           EEPROM_writelong(0,(int)deviceIdReceived);
+           NodeID=(int)deviceIdReceived;
            
            Serial.print(F("Registration: Mine Confirmation received "));
            printf("%lu. \n\r",deviceIdReceived);
