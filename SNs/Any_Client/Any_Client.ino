@@ -22,10 +22,17 @@ const char checksum_err[] PROGMEM = "Checksum error!\r\n";
 
 // Define sensors connection to pins
 // TODO: Move it to EPROM to make code fully independent
-   int sensors_DHT_connection_bit = 256 * B0000000 + B0100000;
-   int sensors_PIR_connection_bit = 256 * B0000000 + B0000100;
-int sensors_SWITCH_connection_bit = 256 * B0000000 + B0000010;
-   int sensors_LED_connection_bit = 256 * B0000000 + B0001000;
+// v0.3
+   int sensors_DHT_connection_bit = 256 * B0000000 + B0000010;
+   int sensors_PIR_connection_bit = 256 * B0000000 + B0001000;
+int sensors_SWITCH_connection_bit = 256 * B0000000 + B0010000;
+   int sensors_LED_connection_bit = 256 * B0000001 + B0000000;
+
+// v0.9
+//   int sensors_DHT_connection_bit = 256 * B0000000 + B0100000;
+//   int sensors_PIR_connection_bit = 256 * B0000000 + B0000100;
+//int sensors_SWITCH_connection_bit = 256 * B0000000 + B0000010;
+//   int sensors_LED_connection_bit = 256 * B0000000 + B0001000;
 
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10 
